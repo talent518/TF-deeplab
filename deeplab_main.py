@@ -23,6 +23,7 @@ from PIL import Image
 import sys
 import os; os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 import pdb
+import time
 
 def process_im(imname, mu):
   im = np.array(Image.open(imname), dtype=np.float32)
@@ -42,13 +43,13 @@ if __name__ == "__main__":
 
   if sys.argv[2] == 'train':
     pretrained_model = './model/ResNet101_init.tfmodel'
-    model = DeepLab(mode='train')
+    model = DeepLab(mode='train',weight_decay_rate=1e-7)
     load_var = {var.op.name: var for var in tf.global_variables() 
         if not 'Momentum' in var.op.name and not 'global_step' in var.op.name}
     snapshot_restorer = tf.train.Saver(load_var)
   else:
-    pretrained_model = './model/ResNet101_train.tfmodel'
-    # pretrained_model = './model/ResNet101_epoch_2.tfmodel'
+    # pretrained_model = './model/ResNet101_train.tfmodel'
+    pretrained_model = './model/ResNet101_epoch_2.tfmodel'
     model = DeepLab()
     snapshot_restorer = tf.train.Saver()
   sess = tf.Session()
@@ -65,20 +66,19 @@ if __name__ == "__main__":
     seg.save('example/2007_000129.png')
 
   elif sys.argv[2] == 'test':
-    pascal_dir = '/media/Work_HD/cxliu/datasets/VOCdevkit/VOC2012/JPEGImages/'
-    list_dir = '/media/Work_HD/cxliu/projects/deeplab/list/'
-    save_dir = 'example/val/'
-    lines = np.loadtxt(list_dir + 'val_id.txt', dtype=str)
+    pascal_dir = '/home/VOCdevkit/'
+    lines = np.loadtxt(pascal_dir + 'test.txt', dtype=str)
     for i, line in enumerate(lines):
       imname = line
-      im = process_im(pascal_dir + imname + '.jpg', mu)
+      im = process_im(pascal_dir + "JPEGImages/" + imname + '.jpg', mu)
       pred = sess.run(model.up, feed_dict={
                 model.images : im
             })
       pred = np.argmax(pred, axis=3).squeeze().astype(np.uint8)
       seg = Image.fromarray(pred)
-      seg.save('example/val/' + imname + '.png')
+      seg.save('example/test/' + imname + '.png')
       print('processing %d/%d' % (i + 1, len(lines)))
+      sys.stdout.flush()
 
   elif sys.argv[2] == 'train':
     cls_loss_avg = 0
@@ -86,12 +86,12 @@ if __name__ == "__main__":
     num_epochs = 2 # train for 2 epochs
     snapshot_saver = tf.train.Saver(max_to_keep = 1000)
     snapshot_file = './model/ResNet101_epoch_%d.tfmodel'
-    pascal_dir = '/media/Work_HD/cxliu/datasets/VOCdevkit/VOC2012'
-    list_dir = '/media/Work_HD/cxliu/projects/deeplab/list/'
-    lines = np.loadtxt(list_dir + 'train_aug.txt', dtype=str)
+    pascal_dir = '/home/VOCdevkit'
+    lines = np.loadtxt(pascal_dir + '/train.txt', dtype=str)
     for epoch in range(num_epochs):
       lines = np.random.permutation(lines)
       for i, line in enumerate(lines):
+        btime = time.time()
         imname, labelname = line
         im = process_im(pascal_dir + imname, mu)
         label = np.array(Image.open(pascal_dir + labelname))
@@ -105,6 +105,6 @@ if __name__ == "__main__":
             model.labels : np.expand_dims(label, axis=3)
           })
         cls_loss_avg = decay*cls_loss_avg + (1-decay)*cls_loss_val
-        print('iter = %d / %d, loss (cur) = %f, loss (avg) = %f, lr = %f' % (i, 
-          len(lines), cls_loss_val, cls_loss_avg, lr_val))
+        print('runtime = %fs, iter = %d / %d, loss (cur) = %f, loss (avg) = %f, lr = %f' % (time.time()-btime, i, len(lines), cls_loss_val, cls_loss_avg, lr_val))
+        sys.stdout.flush()
       snapshot_saver.save(sess, snapshot_file % (epoch + 1))
