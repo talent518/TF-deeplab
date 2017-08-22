@@ -25,6 +25,18 @@ import os; os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 import pdb
 import time
 
+# colour map
+label_colours = [(0,0,0)
+                # 0=background
+                ,(128,0,0),(0,128,0),(128,128,0),(0,0,128),(128,0,128)
+                # 1=aeroplane, 2=bicycle, 3=bird, 4=boat, 5=bottle
+                ,(0,128,128),(128,128,128),(64,0,0),(192,0,0),(64,128,0)
+                # 6=bus, 7=car, 8=cat, 9=chair, 10=cow
+                ,(192,128,0),(64,0,128),(192,0,128),(64,128,128),(192,128,128)
+                # 11=diningtable, 12=dog, 13=horse, 14=motorbike, 15=person
+                ,(0,64,0),(128,64,0),(0,192,0),(128,192,0),(0,64,128)]
+                # 16=potted plant, 17=sheep, 18=sofa, 19=train, 20=tv/monitor
+
 def process_im(imname, mu):
   im = np.array(Image.open(imname), dtype=np.float32)
   if im.ndim == 3:
@@ -36,6 +48,16 @@ def process_im(imname, mu):
   im -= mu
   im = np.expand_dims(im, axis=0)
   return im
+
+def save_image(pred, file_path, num_classes=21):
+    h, w = pred.shape
+    img = Image.new('RGB', (w, h))
+    pixels = img.load()
+    for k, v in enumerate(pred):
+        for k2, v2 in enumerate(v):
+            if v2 < num_classes:
+                pixels[k2,k] = label_colours[v2]
+    img.save(file_path)
 
 if __name__ == "__main__":
 
@@ -62,8 +84,8 @@ if __name__ == "__main__":
               model.images  : im
           })
     pred = np.argmax(pred, axis=3).squeeze().astype(np.uint8)
-    seg = Image.fromarray(pred)
-    seg.save('example/2007_000129.png')
+    
+    save_image(pred, 'example/2007_000129.png')
 
   elif sys.argv[2] == 'test':
     pascal_dir = '/home/VOCdevkit/'
@@ -75,8 +97,7 @@ if __name__ == "__main__":
                 model.images : im
             })
       pred = np.argmax(pred, axis=3).squeeze().astype(np.uint8)
-      seg = Image.fromarray(pred)
-      seg.save('example/test/' + imname + '.png')
+      save_image(pred, 'example/test/' + imname + '.png')
       print('processing %d/%d' % (i + 1, len(lines)))
       sys.stdout.flush()
 
