@@ -62,6 +62,7 @@ def save_image(pred, file_path, num_classes=21):
 if __name__ == "__main__":
 
   mu = np.array((104.00698793, 116.66876762, 122.67891434))
+  num_epochs = 20 # train for 2 epochs
 
   if sys.argv[2] == 'train':
     pretrained_model = './model/ResNet101_init.tfmodel'
@@ -70,8 +71,11 @@ if __name__ == "__main__":
         if not 'Momentum' in var.op.name and not 'global_step' in var.op.name}
     snapshot_restorer = tf.train.Saver(load_var)
   else:
-    # pretrained_model = './model/ResNet101_train.tfmodel'
-    pretrained_model = './model/ResNet101_epoch_2.tfmodel'
+    pretrained_model = './model/ResNet101_train.tfmodel'
+    for i in range(num_epochs, 1, -1):
+        tfmodel = './model/ResNet101_epoch_%02d.tfmodel' % i
+        if os.path.exists(tfmodel):
+            pretrained_model = tfmodel
     model = DeepLab()
     snapshot_restorer = tf.train.Saver()
   sess = tf.Session()
@@ -104,9 +108,8 @@ if __name__ == "__main__":
   elif sys.argv[2] == 'train':
     cls_loss_avg = 0
     decay = 0.99
-    num_epochs = 2 # train for 2 epochs
     snapshot_saver = tf.train.Saver(max_to_keep = 1000)
-    snapshot_file = './model/ResNet101_epoch_%d.tfmodel'
+    snapshot_file = './model/ResNet101_epoch_%02d.tfmodel'
     pascal_dir = '/home/VOCdevkit'
     lines = np.loadtxt(pascal_dir + '/train.txt', dtype=str)
     for epoch in range(num_epochs):
@@ -126,6 +129,6 @@ if __name__ == "__main__":
             model.labels : np.expand_dims(label, axis=3)
           })
         cls_loss_avg = decay*cls_loss_avg + (1-decay)*cls_loss_val
-        print('runtime = %fs, iter = %d / %d, loss (cur) = %f, loss (avg) = %f, lr = %f' % (time.time()-btime, i, len(lines), cls_loss_val, cls_loss_avg, lr_val))
+        print('runtime = %2.3fs, epoch = %d, iter = %d / %d, loss (cur) = %f, loss (avg) = %f, lr = %f' % (time.time()-btime, epoch, i, len(lines), cls_loss_val, cls_loss_avg, lr_val))
         sys.stdout.flush()
       snapshot_saver.save(sess, snapshot_file % (epoch + 1))
