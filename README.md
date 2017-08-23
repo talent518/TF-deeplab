@@ -22,18 +22,22 @@ python npy2tfmodel.py 0 ./model/ResNet101_init.npy ./model/ResNet101_init.tfmode
 python npy2tfmodel.py 0 ./model/ResNet101_train.npy ./model/ResNet101_train.tfmodel
 python npy2tfmodel.py 0 ./model/ResNet101_train2.npy ./model/ResNet101_train2.tfmodel
 ```
+- Select cuda gpu devices id
+```bash
+export CUDA_VISIBLE_DEVICES=0
+```
 - Test on a single image
 ```bash
-python deeplab_main.py 0 single
+python deeplab_main.py single
 ```
 - Test on the PASCAL VOC2012 validation set (you will also want to look at the `matlab` folder and run `EvalSegResults.m` after you run the following command)
 ```bash
-python deeplab_main.py 0 test
+python deeplab_main.py test
 ```
 
 - To train on the PASCAL VOC2012 `train_aug`, run
 ```bash
-python deeplab_main.py 0 train
+python deeplab_main.py train
 ```
 
 ## Performance

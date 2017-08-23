@@ -21,7 +21,7 @@ import numpy as np
 from deeplab_model import DeepLab
 from PIL import Image
 import sys
-import os; os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
+import os;
 import pdb
 import time
 
@@ -38,7 +38,10 @@ label_colours = [(0,0,0)
                 # 16=potted plant, 17=sheep, 18=sofa, 19=train, 20=tv/monitor
 
 def process_im(imname, mu):
-  im = np.array(Image.open(imname), dtype=np.float32)
+    process_im(Image.open(imname), mu)
+
+def process_im_ex(img, mu):
+  im = np.array(img, dtype=np.float32)
   if im.ndim == 3:
     if im.shape[2] == 4:
       im = im[:, :, 0:3]
@@ -50,6 +53,9 @@ def process_im(imname, mu):
   return im
 
 def save_image(pred, file_path, num_classes=21):
+    save_image_ex(pred, num_classes=num_classes).save(file_path)
+
+def save_image_ex(pred, num_classes=21):
     h, w = pred.shape
     img = Image.new('RGB', (w, h))
     pixels = img.load()
@@ -57,14 +63,14 @@ def save_image(pred, file_path, num_classes=21):
         for k2, v2 in enumerate(v):
             if v2 < num_classes:
                 pixels[k2,k] = label_colours[v2]
-    img.save(file_path)
+    return img
 
 if __name__ == "__main__":
 
   mu = np.array((104.00698793, 116.66876762, 122.67891434))
   num_epochs = 20 # train for 2 epochs
 
-  if sys.argv[2] == 'train':
+  if sys.argv[1] == 'train':
     pretrained_model = './model/ResNet101_init.tfmodel'
     model = DeepLab(mode='train',weight_decay_rate=1e-7)
     load_var = {var.op.name: var for var in tf.global_variables() 
@@ -82,7 +88,7 @@ if __name__ == "__main__":
   sess.run(tf.global_variables_initializer())
   snapshot_restorer.restore(sess, pretrained_model)
 
-  if sys.argv[2] == 'single':
+  if sys.argv[1] == 'single':
     im = process_im('example/2007_000129.jpg', mu)
     pred = sess.run(model.up, feed_dict={
               model.images  : im
@@ -91,7 +97,7 @@ if __name__ == "__main__":
     
     save_image(pred, 'example/2007_000129.png')
 
-  elif sys.argv[2] == 'test':
+  elif sys.argv[1] == 'test':
     pascal_dir = '/home/VOCdevkit/'
     lines = np.loadtxt(pascal_dir + 'test.txt', dtype=str)
     for i, line in enumerate(lines):
@@ -105,7 +111,7 @@ if __name__ == "__main__":
       print('processing %d/%d' % (i + 1, len(lines)))
       sys.stdout.flush()
 
-  elif sys.argv[2] == 'train':
+  elif sys.argv[1] == 'train':
     cls_loss_avg = 0
     decay = 0.99
     snapshot_saver = tf.train.Saver(max_to_keep = 1000)
