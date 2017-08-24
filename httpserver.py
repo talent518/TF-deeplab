@@ -181,9 +181,7 @@ class ThreadingServer(BaseHTTPServer.HTTPServer):
             srvr = None
         finally:
             print("destory all threads before exit...")
-            if self.pool.dismissedWorkers:
-                print("Joining all dismissed worker threads...")
-                self.pool.joinAllDismissedWorkers()
+            self.pool.dismissWorkers(pool_size, do_join=True)
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
