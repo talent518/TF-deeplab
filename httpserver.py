@@ -10,6 +10,8 @@ import re
 import os
 import sys
 import time
+import signal
+import threadpool
 
 try:
     from cStringIO import StringIO
@@ -101,7 +103,7 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.wfile.write(postStr)
 
-    def action_train(self, image, label):
+    def action_train(self, image, label, trains=10):
         global model
         global sess
         global mu
@@ -115,7 +117,6 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         cls_loss_avg = 0
         decay = 0.99
-        trains = 10
         f = StringIO()
         for i in range(trains):
             btime = time.time()
@@ -161,8 +162,73 @@ class HTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         f.close()
         return ret
 
-class ThreadingServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
-    pass
+class ThreadingServer(BaseHTTPServer.HTTPServer):
+    def serve_forever_thread(self, poll_interval):
+        BaseHTTPServer.HTTPServer.serve_forever(self, poll_interval)
+
+    def serve_forever(self, poll_interval=0.5):
+        pool_size = cpu_count() * 2 + 1
+        self.pool = threadpool.ThreadPool(pool_size)
+        self.pool.putRequest(threadpool.WorkRequest(self.serve_forever_thread, args=[poll_interval]))
+        try:
+            while True:
+                time.sleep(0.001)
+                self.pool.poll()
+        except KeyboardInterrupt:
+            global srvr
+            srvr.shutdown()
+            srvr.server_close()
+            srvr = None
+        finally:
+            print("destory all threads before exit...")
+            if self.pool.dismissedWorkers:
+                print("Joining all dismissed worker threads...")
+                self.pool.joinAllDismissedWorkers()
+
+    def process_request_thread(self, request, client_address):
+        """Same as in BaseServer but as a thread.
+
+        In addition, exception handling is done here.
+
+        """
+        try:
+            self.finish_request(request, client_address)
+            self.shutdown_request(request)
+        except:
+            self.handle_error(request, client_address)
+            self.shutdown_request(request)
+
+    def process_request(self, request, client_address):
+        self.pool.putRequest(threadpool.WorkRequest(self.process_request_thread, args=[request, client_address]))
+
+def cpu_count():
+    '''
+    Returns the number of CPUs in the system
+    '''
+    if sys.platform == 'win32':
+        try:
+            num = int(os.environ['NUMBER_OF_PROCESSORS'])
+        except (ValueError, KeyError):
+            num = 0
+    elif 'bsd' in sys.platform or sys.platform == 'darwin':
+        comm = '/sbin/sysctl -n hw.ncpu'
+        if sys.platform == 'darwin':
+            comm = '/usr' + comm
+        try:
+            with os.popen(comm) as p:
+                num = int(p.read())
+        except ValueError:
+            num = 0
+    else:
+        try:
+            num = os.sysconf('SC_NPROCESSORS_ONLN')
+        except (ValueError, OSError, AttributeError):
+            num = 0
+
+    if num >= 1:
+        return num
+    else:
+        return 2
 
 def get_arguments():
     """Parse all the arguments provided from the CLI.
@@ -223,6 +289,12 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
+        pass
+    finally:
+        print 'exiting...'
+        if srvr is not None:
+            srvr.shutdown()
+            srvr.server_close()
         # save train result
         if sess is not None:
             if not os.path.exists(savedir):
@@ -233,6 +305,4 @@ if __name__ == '__main__':
             httpclient.writefile(stepfile, str(step))
             loader = tf.train.Saver(max_to_keep = 1000)
             loader.save(sess, os.path.join(savedir, 'model.ckpt'), global_step=step)
-        if srvr is not None:
-            srvr.shutdown()
         print 'exited.'

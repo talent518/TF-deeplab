@@ -48,7 +48,7 @@ def writefile(file, body):
     return ret
 
 if __name__ == '__main__':
-    response, status = request('/train', {'image': base64.encodestring(readfile('/home/VOCdevkit/JPEGImages/2007_003169.jpg')), 'label': base64.encodestring(readfile('/home/VOCdevkit/SegmentationClassAug/2007_003169.png'))})
+    response, status = request('/train', {'trains': 20, 'image': base64.encodestring(readfile('/home/VOCdevkit/JPEGImages/2007_003169.jpg')), 'label': base64.encodestring(readfile('/home/VOCdevkit/SegmentationClassAug/2007_003169.png'))})
 
     print '/train', status, response if not status else base64.decodestring(response)
 
